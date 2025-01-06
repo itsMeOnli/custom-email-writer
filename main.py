@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
-#import google.generativeai as genai
-import openai
+import google.generativeai as genai
+from openai import OpenAI
 from typing import Dict
 
 def get_openai_response(template: str, context: str, comments: str, model: str, api_key: str) -> str:
@@ -9,7 +9,7 @@ def get_openai_response(template: str, context: str, comments: str, model: str, 
     if not api_key:
         raise ValueError("Please enter your OpenAI API key")
     
-    openai.api_key = api_key
+    client = OpenAI(api_key=api_key)
     
     prompt = f"""
     Email Template:
@@ -25,14 +25,14 @@ def get_openai_response(template: str, context: str, comments: str, model: str, 
     Make sure to maintain a professional tone while personalizing the content.
     """
     
-    response = openai.chat.completions.create(
+    response = client.chat.completions.create(
         model=model,
         messages=[{"role": "user", "content": prompt}],
         max_tokens=1000
     )
     
     return response.choices[0].message.content
-'''
+
 def get_google_response(template: str, context: str, comments: str, model: str, api_key: str) -> str:
     """Handle Google Gemini API requests"""
     if not api_key:
@@ -57,7 +57,7 @@ def get_google_response(template: str, context: str, comments: str, model: str, 
     
     response = model.generate_content(prompt)
     return response.text
-'''
+
 def get_anthropic_response(template: str, context: str, comments: str, model: str, api_key: str) -> str:
     """Handle Anthropic API requests"""
     if not api_key:
@@ -102,7 +102,7 @@ def main():
     
     st.write("""
     This app helps you customize email templates based on recipient context.
-    Choose your preferred AI model and enter your API key below. Google does not work currently
+    Choose your preferred AI model and enter your API key below.
     """)
     
     # Initialize session state for storing API key
@@ -121,19 +121,16 @@ def main():
             "Select Model",
             ["gpt-4", "gpt-3.5-turbo"]
         )
-    else:  # Anthropic
-        model = st.selectbox(
-            "Select Model",
-            ["claude-3-sonnet-20240229", "claude-3-opus-20240229"]
-        )
-    '''
     elif api_provider == "Google":
         model = st.selectbox(
             "Select Model",
             ["gemini-pro"]
         )
-    '''
-
+    else:  # Anthropic
+        model = st.selectbox(
+            "Select Model",
+            ["claude-3-sonnet-20240229", "claude-3-opus-20240229"]
+        )
     
     # API Key input
     api_key = st.text_input(
@@ -178,8 +175,8 @@ def main():
                 # Get response based on selected API
                 if api_provider == "OpenAI":
                     customized_email = get_openai_response(template, context, comments, model, api_key)
-                #elif api_provider == "Google":
-                    #customized_email = get_google_response(template, context, comments, model, api_key)
+                elif api_provider == "Google":
+                    customized_email = get_google_response(template, context, comments, model, api_key)
                 else:  # Anthropic
                     customized_email = get_anthropic_response(template, context, comments, model, api_key)
                 
