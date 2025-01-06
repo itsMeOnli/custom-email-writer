@@ -1,17 +1,67 @@
 import streamlit as st
 import requests
-import os
+import google.generativeai as genai
+import openai
 from typing import Dict
 
-def get_llm_response(template: str, context: str, comments: str) -> Dict:
-    """
-    Send request to LLM API and get response.
-    Note: This example uses Anthropic's API. Adjust based on your preferred LLM provider.
-    """
-    api_key = os.getenv('ANTHROPIC_API_KEY')
-    
+def get_openai_response(template: str, context: str, comments: str, model: str, api_key: str) -> str:
+    """Handle OpenAI API requests"""
     if not api_key:
-        raise ValueError("API key not found in environment variables")
+        raise ValueError("Please enter your OpenAI API key")
+    
+    openai.api_key = api_key
+    
+    prompt = f"""
+    Email Template:
+    {template}
+    
+    Recipient Context:
+    {context}
+    
+    Additional Comments:
+    {comments}
+    
+    Please customize this email template based on the recipient context and any additional comments provided.
+    Make sure to maintain a professional tone while personalizing the content.
+    """
+    
+    response = openai.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=1000
+    )
+    
+    return response.choices[0].message.content
+
+def get_google_response(template: str, context: str, comments: str, model: str, api_key: str) -> str:
+    """Handle Google Gemini API requests"""
+    if not api_key:
+        raise ValueError("Please enter your Google API key")
+    
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel(model)
+    
+    prompt = f"""
+    Email Template:
+    {template}
+    
+    Recipient Context:
+    {context}
+    
+    Additional Comments:
+    {comments}
+    
+    Please customize this email template based on the recipient context and any additional comments provided.
+    Make sure to maintain a professional tone while personalizing the content.
+    """
+    
+    response = model.generate_content(prompt)
+    return response.text
+
+def get_anthropic_response(template: str, context: str, comments: str, model: str, api_key: str) -> str:
+    """Handle Anthropic API requests"""
+    if not api_key:
+        raise ValueError("Please enter your Anthropic API key")
     
     headers = {
         "x-api-key": api_key,
@@ -34,7 +84,7 @@ def get_llm_response(template: str, context: str, comments: str) -> Dict:
     """
     
     data = {
-        "model": "claude-3-sonnet-20240229",
+        "model": model,
         "max_tokens": 1000,
         "messages": [{"role": "user", "content": prompt}]
     }
@@ -45,18 +95,54 @@ def get_llm_response(template: str, context: str, comments: str) -> Dict:
         json=data
     )
     
-    return response.json()
+    return response.json()['content'][0]['text']
 
 def main():
     st.title("Email Template Customizer")
     
-    # Add description
     st.write("""
     This app helps you customize email templates based on recipient context.
-    Enter your template, provide context about the recipient, and add any additional comments.
+    Choose your preferred AI model and enter your API key below.
     """)
     
-    # Create input fields
+    # Initialize session state for storing API key
+    if 'api_key' not in st.session_state:
+        st.session_state.api_key = ""
+    
+    # API and Model Selection
+    api_provider = st.selectbox(
+        "Select API Provider",
+        ["OpenAI", "Google", "Anthropic"]
+    )
+    
+    # Model selection based on provider
+    if api_provider == "OpenAI":
+        model = st.selectbox(
+            "Select Model",
+            ["gpt-4", "gpt-3.5-turbo"]
+        )
+    elif api_provider == "Google":
+        model = st.selectbox(
+            "Select Model",
+            ["gemini-pro"]
+        )
+    else:  # Anthropic
+        model = st.selectbox(
+            "Select Model",
+            ["claude-3-sonnet-20240229", "claude-3-opus-20240229"]
+        )
+    
+    # API Key input
+    api_key = st.text_input(
+        f"Enter your {api_provider} API Key",
+        type="password",
+        value=st.session_state.api_key
+    )
+    
+    # Store API key in session state
+    st.session_state.api_key = api_key
+    
+    # Input fields
     template = st.text_area(
         "Email Template",
         height=200,
@@ -75,20 +161,26 @@ def main():
         placeholder="Any additional instructions or comments..."
     )
     
-    # Create submit button
     if st.button("Customize Email"):
         if not template or not context:
             st.error("Please provide both template and recipient context.")
             return
         
+        if not api_key:
+            st.error(f"Please enter your {api_provider} API key.")
+            return
+        
         try:
             with st.spinner("Customizing your email..."):
-                response = get_llm_response(template, context, comments)
+                # Get response based on selected API
+                if api_provider == "OpenAI":
+                    customized_email = get_openai_response(template, context, comments, model, api_key)
+                elif api_provider == "Google":
+                    customized_email = get_google_response(template, context, comments, model, api_key)
+                else:  # Anthropic
+                    customized_email = get_anthropic_response(template, context, comments, model, api_key)
                 
-                # Extract the customized email from the response
-                customized_email = response['content'][0]['text']
-                
-                # Display result in a new text area
+                # Display result
                 st.subheader("Customized Email")
                 st.text_area(
                     "Result",
@@ -97,7 +189,7 @@ def main():
                     key="result"
                 )
                 
-                # Add a copy button
+                # Copy button
                 st.button(
                     "Copy to Clipboard",
                     on_click=lambda: st.write(
