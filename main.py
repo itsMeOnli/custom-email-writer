@@ -121,6 +121,11 @@ def main():
             "Select Model",
             ["gpt-4", "gpt-3.5-turbo"]
         )
+    else:  # Anthropic
+        model = st.selectbox(
+            "Select Model",
+            ["claude-3-sonnet-20240229", "claude-3-opus-20240229"]
+        )
     '''
     elif api_provider == "Google":
         model = st.selectbox(
@@ -128,11 +133,7 @@ def main():
             ["gemini-pro"]
         )
     '''
-    else:  # Anthropic
-        model = st.selectbox(
-            "Select Model",
-            ["claude-3-sonnet-20240229", "claude-3-opus-20240229"]
-        )
+
     
     # API Key input
     api_key = st.text_input(
